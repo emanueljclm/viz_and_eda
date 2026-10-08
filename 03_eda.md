@@ -1,10 +1,15 @@
 viz_and_eda
 ================
+emanuel clemente
 2026-10-08
 
+# Global Settings for Every Chunk in the File
+
 ``` r
-library(p8105.datasets)
-library(tidyverse)
+# The function `library()` loads a package so its functions are available for the rest of the file.
+
+library(p8105.datasets) # course datasets, including weather_df
+library(tidyverse) # this package includes the functions dplyr, ggplot2, tidyr, readr, and more
 ```
 
     ## ── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
@@ -19,23 +24,29 @@ library(tidyverse)
     ## ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
 
 ``` r
-library(haven)
+library(haven) # this package reads SAS, SPSS, and Stata files
 ```
+
+# Loading the Dataset
 
 ``` r
 data("weather_df")
 
-weather_df =
-  weather_df |>
-  mutate(
-    month = lubridate::floor_date(date, unit = "month")
+weather_df =    # = at the start saves the result under this name.
+  weather_df |> # the pipe `|>` means "and then": it passes the result on the left into the function on the right.
+                # every line in a pipeline except the last ends with `|>`.
+  mutate(       # the function `mutate()` adds or changes columns
+    month = lubridate::floor_date(date, unit = "month") # `floor_date()` rounds each date down to the 1st of its month (example: 2021-03-17 -> 2021-03-01).
+                                                        # `::` uses a function from a package without loading the whole package.
   )
 ```
 
 ``` r
+# tmax/tmin are in degrees C. prcp is in tenths of a mm (100 = 10 mm).
+
 weather_df |> 
-  ggplot(aes(x = prcp)) + 
-  geom_histogram()
+  ggplot(aes(x = prcp)) + # the function `aes()` maps columns to parts of the plot.
+  geom_histogram()        # `ggplot` layers are joined with `+`, not `|>`.
 ```
 
     ## `stat_bin()` using `bins = 30`. Pick better value `binwidth`.
@@ -46,8 +57,14 @@ weather_df |>
 ![](03_eda_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
 
 ``` r
+# NOTE: messages about "bins = 30" or "removed rows" aren't errors; the removed rows are days with missing prcp.
+```
+
+``` r
+# The function `filters()` keeps only rows where the condition is TRUE.
+
 weather_df |> 
-  filter(prcp >= 1000)
+  filter(prcp >= 1000) # 1000 tenths of a mm = 100 mm (about 4 inches) of rain in one day.
 ```
 
     ## # A tibble: 3 × 7
@@ -59,18 +76,19 @@ weather_df |>
 
 ``` r
 weather_df |> 
-  filter(tmax >= 20, tmax <= 30) |> 
-  ggplot(aes(x = tmin, y = tmax, color = name, shape = name)) + 
-  geom_point(alpha = .75)
+  filter(tmax >= 20, tmax <= 30) |>                             # a comma between conditions means "and".
+  ggplot(aes(x = tmin, y = tmax, color = name, shape = name)) + # color and shape = name give each station its own color and point shape.
+  geom_point(alpha = .75)                                       # alpha = transparency (0 = invisible, 1 = solid); helps when points overlap.
 ```
 
 ![](03_eda_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
 
-## `group_by`
-
-add some groups!
+## `group_by()`
 
 ``` r
+# add some groups! The function `group_by()` tells R to treat each group separately in the steps that follow. By itself, it doesn't change the data; the header just shows "Groups: name, month, [72]"
+# (3 stations x 24 months).
+
 weather_df |>
   group_by(name, month)
 ```
@@ -94,11 +112,13 @@ weather_df |>
 ## `summarize()`
 
 ``` r
+# the function `summarize()` collapses each group into ONE row of summary numbers.
+
 weather_df |>
   group_by(name, month) |>
   summarize(
-    count = n(),
-    n_days = n_distinct(date))
+    count = n(),                # `n()` counts rows in each group
+    n_days = n_distinct(date))  # `n_distinct()` countes unique values
 ```
 
     ## `summarise()` has regrouped the output.
@@ -124,29 +144,39 @@ weather_df |>
     ## 10 CentralPark_NY 2021-10-01    31     31
     ## # ℹ 62 more rows
 
+``` r
+# if `count` and `n_days` didn't match, there'd be duplicate rows.
+# NOTE: "`summarize()` has grouped output by 'name'" is a message, not an error.
+# R drops the last grouping variable (month) after summarizing.
+```
+
 DON’T DO THIS
 
 ``` r
 weather_df |>
-  pull(tmax) |>
-  summary()
+  pull(tmax) |> # the function `pull()` pulls one column out as a plain vector.
+  summary()     # the function `summary()` describes that column.
 ```
 
     ##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.     NAs 
     ##  -11.40    7.20   20.60   17.86   28.30   36.70      17
 
-do this instead
+``` r
+# avoid doing this format as it lumps all three stations together, and the output isn't a data frame, so you can't keep piping it.
+```
+
+Do this instead!
 
 ``` r
 weather_df |>
-  group_by(name) |>
+  group_by(name) |>                                 # one summary row per station
   summarize(
     n = n(),
-    mean_tmax = mean(tmax, na.rm = TRUE),
+    mean_tmax = mean(tmax, na.rm = TRUE),           # `na.rm = TRUE` skips missing values (NA) 
     median_tmax = median(tmax, na.rm = TRUE),
-    q95_prcp = quantile(prcp, 0.95, na.rm = TRUE)
+    q95_prcp = quantile(prcp, 0.95, na.rm = TRUE)   # 95th percentile of daily rain
   ) |>
-  knitr::kable(digits = 2)
+  knitr::kable(digits = 2)                          # the function `kable()` makes a formatted table in the knitted file. `digits = 2` rounds to 2 decimals.
 ```
 
 | name           |   n | mean_tmax | median_tmax | q95_prcp |
@@ -161,9 +191,10 @@ weather_df |>
   summarize(
     mean_tmax = mean(tmax, na.rm = TRUE)
   ) |>
+  # data is "long" here (one row per station-month).
   pivot_wider(
-    names_from = name,
-    values_from = mean_tmax
+    names_from = name,        # each station becomes its own column
+    values_from = mean_tmax   # wide is easier to read, but keep data long for analysis and plotting.
   ) |>
   knitr::kable(digits = 2)
 ```
@@ -209,8 +240,8 @@ weather_df |>
     mean_tmax = mean(tmax, na.rm = TRUE)
   ) |>
   ggplot(aes(x = month, y = mean_tmax, color = name)) +
-  geom_point() +
-  geom_line()
+  geom_point() +         # a dot for each monthly average
+  geom_line()            # connects the dots, with a separate line for each station
 ```
 
     ## `summarise()` has regrouped the output.
@@ -225,8 +256,9 @@ weather_df |>
 ``` r
 weather_df |>
   group_by(name) |>
-  mutate(center_tmax = tmax - mean(tmax, na.rm = TRUE)) |>
-  ggplot(aes(x = date, y = center_tmax, color = name)) +
+  mutate(center_tmax = tmax - mean(tmax, na.rm = TRUE)) |>   # the function `mutate()` keeps every row; `summarize()` collapses them.
+  ggplot(aes(x = date, y = center_tmax, color = name)) +     # when data is grouped, `mean()` inside `mutate()` is calculated within each group.
+                                                             # how much hotter or colder each day was than that STATION's own average.
   geom_point()
 ```
 
@@ -235,15 +267,15 @@ weather_df |>
 
 ![](03_eda_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
 
-What about “window” functions …
-
-Try to rank things
+## What About “Window” Functions?
 
 ``` r
+# Window functions return one value per row, so they go in `mutate()`, not `summarize()`.
+
 weather_df |>
   group_by(name, month) |>
-  mutate(temp_rank = min_rank(desc(tmax))) |>
-  filter(temp_rank < 2)
+  mutate(temp_rank = min_rank(desc(tmax))) |> # the function `min_rank()` ranks smallest = 1. `desc()` flips it so the HOTTEST day = 1.
+  filter(temp_rank < 2)                       # keeps the hottest day per station per month; ties are all kept.
 ```
 
     ## # A tibble: 104 × 8
@@ -268,8 +300,8 @@ lead and lag
 weather_df |>
   group_by(name) |>
   mutate(
-    lagged_tmax = lag(tmax),
-    lead_tmax = lead(tmax)
+    lagged_tmax = lag(tmax),   # value from the previous row (yesterday)
+    lead_tmax = lead(tmax)     # value from the next row (tomorrow)
   )
 ```
 
@@ -290,6 +322,12 @@ weather_df |>
     ## # ℹ 2,180 more rows
 
 ``` r
+# the function `group_by(name) keeps each station separate, so the first day of one station.
+# doesn't borrow a value from the last day of another; it gets 'NA' instead.
+# lag/lead follow the current row order. With unsorted data, add `arrange(date)` after `group_by()`.
+```
+
+``` r
 weather_df |>
   group_by(name) |>
   mutate(
@@ -297,8 +335,8 @@ weather_df |>
     temp_change = tmax - lagged_tmax
   ) |>
   summarize(
-    mean_temp_change = mean(temp_change, na.rm = TRUE),
-    sd_temp_change = sd(temp_change, na.rm = TRUE)
+    mean_temp_change = mean(temp_change, na.rm = TRUE),  # average daily change (close to 0)
+    sd_temp_change = sd(temp_change, na.rm = TRUE)       # bigger SD = bigger day-to-day swings
   )
 ```
 
@@ -309,6 +347,10 @@ weather_df |>
     ## 2 Molokai_HI            -0.000688           1.24
     ## 3 Waterhole_WA          -0.00155            3.04
 
+``` r
+# common pattern: build the variable you need with `mutate()`, then `summarize()` it.
+```
+
 ## Revisiting Some Examples
 
 import, clean, tidy, etc. the pulse data, and compute mean and median
@@ -316,18 +358,18 @@ BDI score at each visit.
 
 ``` r
 pulse_df =
-  haven::read_sas("data/public_pulse_data.sas7bdat") |>
-  janitor::clean_names() |>
+  haven::read_sas("data/public_pulse_data.sas7bdat") |> # reads the SAS file
+  janitor::clean_names() |> # the function `clean_names()` makes names lowercase with underscores (example: BDI_score_BL -> bdi_score_bl)
   pivot_longer(
-    bdi_score_bl:bdi_score_12m,
-    names_to = "visit",
-    names_prefix = "bdi_score_",
-    values_to = "bdi"
-  ) |>
-  select(id, visit, everything()) |>
+    bdi_score_bl:bdi_score_12m,        # columns to stack; `:` means "from this value through that value".
+    names_to = "visit",                # old column names go into a new "visit" column.
+    names_prefix = "bdi_score_",       # strips this text, so "bdi_score_bl" -> "bl".
+    values_to = "bdi"                  # the scores go into a new "bdi" column.
+  ) |>  # wide (one row per person) -> long (one row per person per visit). Long is the tidy format.
+  select(id, visit, everything()) |>   # the function `select()` picks and orders columns; `everything()` = all remaining columns.
   mutate(
-    visit = replace(visit, visit == "bl", "00m")
-  )
+    visit = replace(visit, visit == "bl", "00m") # replace(column, condition, new value). == tests equality.
+  )                                              # baseline becomes "00m" so visits sort in time order: 00m, 01m, 06m, 12m.
 
 pulse_df |>
   group_by(visit) |>
@@ -349,8 +391,11 @@ in the FAS data, compute mean outcome (ears only) across dose and day of
 treatment; show in a reader-friendly table.
 
 ``` r
+# pups file: one row per pup; litter fileL one row per litter, with treatment group.
+
 pups_df =
-  read_csv("data/FAS_pups.csv", skip = 3, na = c("", ".", "NA")) |>
+  read_csv("data/FAS_pups.csv", skip = 3, na = c("", ".", "NA")) |> # `skip = 3` ignores the first 3 lines of the file (for notes above the column names).
+                                                                    # `na = c(...)` lists every way the file marks a missing value.
   janitor::clean_names()
 ```
 
@@ -367,7 +412,7 @@ pups_df =
 litters_df =
   read_csv("data/FAS_litters.csv", na = c("", ".", "NA")) |>
   janitor::clean_names() |>
-  separate(group, into = c("dose", "day_of_tx"), 3)
+  separate(group, into = c("dose", "day_of_tx"), 3)     # `c()` combines values into a vector.
 ```
 
     ## Rows: 49 Columns: 8
@@ -380,21 +425,23 @@ litters_df =
     ## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
 
 ``` r
+                                                        # the 3 splits after the 3rd character: "Con7" -> dose "Con", day_of_tx "7".
+
 fas_df =
-  left_join(pups_df, litters_df, by = "litter_number") |>
+  left_join(pups_df, litters_df, by = "litter_number") |> # keeps every pup row and adds matching litter info, matched on `litter_number`; pups with no matching litter get `NA`.
   select(litter_number, dose, day_of_tx, everything()) |>
-  drop_na(dose, day_of_tx)
+  drop_na(dose, day_of_tx)    # removes rows with. `NA` in these columns (pups with no treatment group).
 
 fas_df |>
   group_by(dose, day_of_tx) |>
   summarize(
-    mean_ears = mean(pd_ears, na.rm = TRUE)
+    mean_ears = mean(pd_ears, na.rm = TRUE) # `pd_ears`= postnatal day the pup's ears unfolded
   ) |>
   pivot_wider(
-    names_from = day_of_tx,
+    names_from = day_of_tx, # one column per treatment day
     values_from = mean_ears
   ) |>
-  knitr::kable(digits = 2)
+  knitr::kable(digits = 2)  # result: one row per dose, one column per day
 ```
 
     ## `summarise()` has regrouped the output.
