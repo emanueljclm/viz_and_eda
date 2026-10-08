@@ -1,0 +1,210 @@
+---
+title: "viz_and_eda"
+output: html_document
+date: "2026-10-08"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(p8105.datasets)
+library(tidyverse)
+library(haven)
+```
+
+```{r}
+data("weather_df")
+
+weather_df =
+  weather_df |>
+  mutate(
+    month = lubridate::floor_date(date, unit = "month")
+  )
+```
+
+```{r}
+weather_df |> 
+  ggplot(aes(x = prcp)) + 
+  geom_histogram()
+```
+
+```{r}
+weather_df |> 
+  filter(prcp >= 1000)
+```
+
+```{r}
+weather_df |> 
+  filter(tmax >= 20, tmax <= 30) |> 
+  ggplot(aes(x = tmin, y = tmax, color = name, shape = name)) + 
+  geom_point(alpha = .75)
+```
+
+## `group_by`
+
+add some groups!
+
+```{r}
+weather_df |>
+  group_by(name, month)
+```
+
+## `summarize()`
+
+```{r}
+weather_df |>
+  group_by(name, month) |>
+  summarize(
+    count = n(),
+    n_days = n_distinct(date))
+
+```
+
+DON'T DO THIS
+
+```{r}
+weather_df |>
+  pull(tmax) |>
+  summary()
+```
+
+do this instead
+
+```{r}
+weather_df |>
+  group_by(name) |>
+  summarize(
+    n = n(),
+    mean_tmax = mean(tmax, na.rm = TRUE),
+    median_tmax = median(tmax, na.rm = TRUE),
+    q95_prcp = quantile(prcp, 0.95, na.rm = TRUE)
+  ) |>
+  knitr::kable(digits = 2)
+```
+
+```{r}
+weather_df |>
+  group_by(name, month) |>
+  summarize(
+    mean_tmax = mean(tmax, na.rm = TRUE)
+  ) |>
+  pivot_wider(
+    names_from = name,
+    values_from = mean_tmax
+  ) |>
+  knitr::kable(digits = 2)
+```
+
+```{r}
+weather_df |>
+  group_by(name, month) |>
+  summarize(
+    mean_tmax = mean(tmax, na.rm = TRUE)
+  ) |>
+  ggplot(aes(x = month, y = mean_tmax, color = name)) +
+  geom_point() +
+  geom_line()
+```
+
+```{r}
+weather_df |>
+  group_by(name) |>
+  mutate(center_tmax = tmax - mean(tmax, na.rm = TRUE)) |>
+  ggplot(aes(x = date, y = center_tmax, color = name)) +
+  geom_point()
+```
+
+What about "window" functions ...
+
+Try to rank things
+
+```{r}
+weather_df |>
+  group_by(name, month) |>
+  mutate(temp_rank = min_rank(desc(tmax))) |>
+  filter(temp_rank < 2)
+```
+
+lead and lag
+
+```{r}
+weather_df |>
+  group_by(name) |>
+  mutate(
+    lagged_tmax = lag(tmax),
+    lead_tmax = lead(tmax)
+  )
+```
+
+```{r}
+weather_df |>
+  group_by(name) |>
+  mutate(
+    lagged_tmax = lag(tmax),
+    temp_change = tmax - lagged_tmax
+  ) |>
+  summarize(
+    mean_temp_change = mean(temp_change, na.rm = TRUE),
+    sd_temp_change = sd(temp_change, na.rm = TRUE)
+  )
+```
+
+## Revisiting Some Examples
+
+import, clean, tidy, etc. the pulse data, and compute mean and median BDI score at each visit.
+
+```{r}
+pulse_df =
+  haven::read_sas("data/public_pulse_data.sas7bdat") |>
+  janitor::clean_names() |>
+  pivot_longer(
+    bdi_score_bl:bdi_score_12m,
+    names_to = "visit",
+    names_prefix = "bdi_score_",
+    values_to = "bdi"
+  ) |>
+  select(id, visit, everything()) |>
+  mutate(
+    visit = replace(visit, visit == "bl", "00m")
+  )
+
+pulse_df |>
+  group_by(visit) |>
+  summarize(
+    mean_bdi = mean(bdi, na.rm = TRUE),
+    median_bdi = median(bdi, na.rm = TRUE)
+  ) |>
+  knitr::kable(digits = 2)
+```
+
+in the FAS data, compute mean outcome (ears only) across dose and day of treatment; show in a reader-friendly table.
+
+```{r}
+pups_df =
+  read_csv("data/FAS_pups.csv", skip = 3, na = c("", ".", "NA")) |>
+  janitor::clean_names()
+
+litters_df =
+  read_csv("data/FAS_litters.csv", na = c("", ".", "NA")) |>
+  janitor::clean_names() |>
+  separate(group, into = c("dose", "day_of_tx"), 3)
+
+fas_df =
+  left_join(pups_df, litters_df, by = "litter_number") |>
+  select(litter_number, dose, day_of_tx, everything()) |>
+  drop_na(dose, day_of_tx)
+
+fas_df |>
+  group_by(dose, day_of_tx) |>
+  summarize(
+    mean_ears = mean(pd_ears, na.rm = TRUE)
+  ) |>
+  pivot_wider(
+    names_from = day_of_tx,
+    values_from = mean_ears
+  ) |>
+  knitr::kable(digits = 2)
+```
