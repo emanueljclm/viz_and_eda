@@ -1,0 +1,255 @@
+---
+title: "02_viz"
+output: github_document
+date: "2026-10-13"
+---
+
+```{r setup, include=FALSE}
+
+# include=FALSE (in the chunk header) runs this chunk but hides it from the knitted output.
+# `echo = TRUE` shows each chunk's code above its output.
+
+# The function `library()` loads a package so its functions are available for the rest of the file.
+
+library(p8105.datasets) # course datasets, including `weather_df`
+library(tidyverse)      # this package bundles the packages `dplyr`, `ggplot2`, `tidyr`, `readr`, and more
+library(patchwork)
+library(haven)
+
+# Global figure settings for every chunk in this document.
+# Set size with two of fig.width / fig.height / fig.asp. Text and points don't scale with the figure,
+# so a wider figure makes the text look smaller once it's embedded.
+knitr::opts_chunk$set(
+  fig.width = 6,        # width (inches) of the figure R creates
+  fig.asp = .6,         # aspect ratio: height = 0.6 x width (a little wider than tall)
+  out.width = "90%"     # size of the figure in the knitted doc; leaves padding at the sides
+)
+
+theme_set(theme_minimal() + theme(legend.position = "bottom"))
+
+options(
+  ggplot2.continuous.colour = "viridis",
+  ggplot2.continuous.fill = "viridis"
+)
+
+scale_colour_discrete = scale_colour_viridis_d
+scale_fill_discrete = scale_fill_viridis_d
+```
+
+# Creating Labels
+
+```{r}
+
+weather_df |> 
+  ggplot(aes(x = tmin, y = tmax)) + 
+  geom_point(aes(color = name), alpha = .5) + 
+  labs(
+    title = "Temperature plot",
+    x = "Minimum daily temperature (C)",
+    y = "Maxiumum daily temperature (C)",
+    color = "Location",
+    caption = "Data from the rnoaa package"
+  )
+```
+
+# Creating Scales
+
+```{r}
+
+weather_df |> 
+  ggplot(aes(x = tmin, y = tmax)) + 
+  geom_point(aes(color = name), alpha = .5) + 
+  labs(
+    title = "Temperature plot",
+    x = "Minimum daily temperature (C)",
+    y = "Maxiumum daily temperature (C)",
+    color = "Location",
+    caption = "Data from the rnoaa package") + 
+  scale_x_continuous(
+    breaks = c(-15, 0, 15), 
+    labels = c("-15º C", "0", "15"))
+
+weather_df |> 
+  ggplot(aes(x = tmin, y = tmax)) + 
+  geom_point(aes(color = name), alpha = .5) + 
+  labs(
+    title = "Temperature plot",
+    x = "Minimum daily temperature (C)",
+    y = "Maxiumum daily temperature (C)",
+    color = "Location",
+    caption = "Data from the rnoaa package") + 
+  scale_x_continuous(
+    breaks = c(-15, 0, 15), 
+    labels = c("-15ºC", "0", "15"),
+    limits = c(-20, 30)) + 
+  scale_y_continuous(
+    trans = "sqrt", 
+    position = "right")
+
+weather_df |> 
+  ggplot(aes(x = tmin, y = tmax)) + 
+  geom_point(aes(color = name), alpha = .5) + 
+  labs(
+    title = "Temperature plot",
+    x = "Minimum daily temperature (C)",
+    y = "Maxiumum daily temperature (C)",
+    color = "Location",
+    caption = "Data from the rnoaa package") + 
+  scale_color_hue(h = c(100, 300))
+
+ggp_temp_plot = 
+  weather_df |> 
+  ggplot(aes(x = tmin, y = tmax)) + 
+  geom_point(aes(color = name), alpha = .5) + 
+  labs(
+    title = "Temperature plot",
+    x = "Minimum daily temperature (C)",
+    y = "Maxiumum daily temperature (C)",
+    color = "Location",
+    caption = "Data from the rnoaa package"
+  ) + 
+  viridis::scale_color_viridis(
+    name = "Location", 
+    discrete = TRUE
+  )
+
+ggp_temp_plot
+```
+
+# Creating Themes
+
+```{r}
+ggp_temp_plot + 
+  theme(legend.position = "bottom")
+
+ggp_temp_plot + 
+  theme_bw() + 
+  theme(legend.position = "bottom")
+
+ggp_temp_plot + 
+  theme_classic() + 
+  theme(legend.position = "bottom")
+
+ggp_temp_plot + 
+  ggthemes::theme_excel() + 
+  theme(legend.position = "bottom")
+```
+
+# Data Argument in `geom_*`
+
+```{r}
+central_park_df = 
+  weather_df |> 
+  filter(name == "CentralPark_NY")
+
+molokai_df = 
+  weather_df |> 
+  filter(name == "Molokai_HI")
+
+ggplot(data = molokai_df, aes(x = date, y = tmax, color = name)) + 
+  geom_point() + 
+  geom_line(data = central_park_df)
+```
+
+# `patchwork`
+
+```{r}
+ggp_tmax_tmin = 
+  weather_df |> 
+  ggplot(aes(x = tmax, y = tmin, color = name)) + 
+  geom_point(alpha = .5) +
+  theme(legend.position = "none")
+
+ggp_prcp_dens = 
+  weather_df |> 
+  filter(prcp > 0) |> 
+  ggplot(aes(x = prcp, fill = name)) + 
+  geom_density(alpha = .5) + 
+  theme(legend.position = "none")
+
+ggp_tmax_date = 
+  weather_df |> 
+  ggplot(aes(x = date, y = tmax, color = name)) + 
+  geom_point(alpha = .5) +
+  geom_smooth(se = FALSE) + 
+  theme(legend.position = "bottom")
+
+(ggp_tmax_tmin + ggp_prcp_dens) / ggp_tmax_date
+```
+
+# Data Manipulation
+
+```{r}
+weather_df |>
+  mutate(name = forcats::fct_relevel(name, c("Molokai_HI", "CentralPark_NY", "Waterhole_WA"))) |> 
+  ggplot(aes(x = name, y = tmax)) + 
+  geom_violin(aes(fill = name), color = "blue", alpha = .5) + 
+  theme(legend.position = "bottom")
+
+weather_df |>
+  mutate(name = forcats::fct_reorder(name, tmax)) |> 
+  ggplot(aes(x = name, y = tmax)) + 
+  geom_violin(aes(fill = name), color = "blue", alpha = .5) + 
+  theme(legend.position = "bottom")
+
+weather_df |>
+  select(name, tmax, tmin) |> 
+  pivot_longer(
+    tmax:tmin,
+    names_to = "observation", 
+    values_to = "temp") |> 
+  ggplot(aes(x = temp, fill = observation)) +
+  geom_density(alpha = .5) + 
+  facet_grid(~name) + 
+  viridis::scale_fill_viridis(discrete = TRUE)
+
+pulse_data = 
+  haven::read_sas("./data/public_pulse_data.sas7bdat") |>
+  janitor::clean_names() |>
+  pivot_longer(
+    bdi_score_bl:bdi_score_12m,
+    names_to = "visit", 
+    names_prefix = "bdi_score_",
+    values_to = "bdi") |>
+  select(id, visit, everything()) |>
+  mutate(
+    visit = recode(visit, "bl" = "00m"),
+    visit = factor(visit, levels = str_c(c("00", "01", "06", "12"), "m"))) |>
+  arrange(id, visit)
+
+ggplot(pulse_data, aes(x = visit, y = bdi)) + 
+  geom_boxplot()
+```
+
+## FAS Data Example
+
+```{r}
+pup_data = 
+  read_csv("./data/FAS_pups.csv", na = c("NA", ".", ""), skip = 3) |>
+  janitor::clean_names() |>
+  mutate(
+    sex = 
+      case_match(
+        sex, 
+        1 ~ "male", 
+        2 ~ "female"))
+
+litter_data = 
+  read_csv("./data/FAS_litters.csv", na = c("NA", ".", "")) |>
+  janitor::clean_names() |>
+  separate(group, into = c("dose", "day_of_tx"), sep = 3)
+
+fas_data = left_join(pup_data, litter_data, by = "litter_number") 
+
+fas_data |> 
+  select(sex, dose, day_of_tx, pd_ears:pd_walk) |> 
+  pivot_longer(
+    pd_ears:pd_walk,
+    names_to = "outcome", 
+    values_to = "pn_day") |> 
+  drop_na() |> 
+  mutate(outcome = forcats::fct_reorder(outcome, pn_day, median)) |> 
+  ggplot(aes(x = dose, y = pn_day)) + 
+  geom_violin() + 
+  facet_grid(day_of_tx ~ outcome)
+```
